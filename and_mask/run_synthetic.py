@@ -99,6 +99,7 @@ def train(model, device, train_loaders, optimizer, epoch, writer,
             method=method,
             scale_grad_inverse_sparsity=scale_grad_inverse_sparsity,
         )
+        
         model.step += 1
 
         if l1_coef > 0.0:
