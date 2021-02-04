@@ -1,14 +1,22 @@
 
-### ILC Exploration repo
+# ILC Exploration repo
 This repo contains empirical exploration of the ILC methodology and attempts at improvement of the AND-Mask method through generalized combination of gradients.
 
 This is a fork from the "Learning Explanations hat are Hard to Vary" paper repository. Credit to Amin M (@amimem) for the colored MNIST experiment on ILC
 
+### Generalized-Mask (GEN-Mask)
 
-#### Instructions
+Easy testing of different optimization of gradient combination can be explored in gen_mask/gen_mask_utils where the get_grads function is the function called at each training step
+
+### TODO
+
+ - [] Implement Benchmark from "Empirical or Invariant Risk Minimization? A Sample Complexity Perspective"
+
+### Instructions
 To run the baseline (standard SGD), use `method='and_mask'` and `agreement_threshold=0.`
 
-There are two examples:
+## Running the experiments
+
 ### Synthetic dataset
 
 #### AND-Mask
