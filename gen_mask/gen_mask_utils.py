@@ -40,9 +40,6 @@ def get_grads(batch_size, n_envs,
     assert len(param_gradients) == len(params)
     assert len(param_gradients[0]) == n_envs
 
- 
-    
-
     for param, grads in zip(params, param_gradients):
         
         def fun(x):
@@ -63,6 +60,8 @@ def get_grads(batch_size, n_envs,
 
         res = minimize(fun, np.zeros(n_envs), method='SLSQP', bounds=bnds, constraints=cons)
 
-        print(res)
+        param.grad = torch.zeros_like(grads[0])
+        for p, env_grad in zip(res.x, grads):
+            param.grad = torch.add(param.grad, p*env_grad)
 
     return mean_loss
