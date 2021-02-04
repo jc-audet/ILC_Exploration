@@ -10,7 +10,7 @@ Easy testing of different optimization of gradient combination can be explored i
 
 ### TODO
 
- - [] Implement Benchmark from "Empirical or Invariant Risk Minimization? A Sample Complexity Perspective"
+ - [ ] Implement Benchmark from "Empirical or Invariant Risk Minimization? A Sample Complexity Perspective"
 
 ### Instructions
 To run the baseline (standard SGD), use `method='and_mask'` and `agreement_threshold=0.`
