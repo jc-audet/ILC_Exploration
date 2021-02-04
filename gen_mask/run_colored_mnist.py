@@ -91,21 +91,18 @@ def train(model, args, device, train_loader, optimizer, epoch, writer,
         labels = labels.to(device)
         optimizer.zero_grad()
         output = model(images)
-        if agreement_threshold > 0.0:
-            # The "batch_size" in this function refers to the batch size per env
-            # Since we treat every example as one env, we should set the parameter
-            # n_agreement_envs equal to batch size
-            batch_size=1
-            n_envs = args.batch_size
-            mean_loss = gen_mask_utils.get_grads(
-                batch_size, n_envs,
-                loss_fn, params=optimizer.param_groups[0]['params'],
-                output=output, 
-                target=labels
-            )
-        else:
-            mean_loss = loss_fn(output, labels)
-            mean_loss.backward()
+        
+        # The "batch_size" in this function refers to the batch size per env
+        # Since we treat every example as one env, we should set the parameter
+        # n_agreement_envs equal to batch size
+        batch_size=1
+        n_envs = args.batch_size
+        mean_loss = gen_mask_utils.get_grads(
+            batch_size, n_envs,
+            loss_fn, params=optimizer.param_groups[0]['params'],
+            output=output, 
+            target=labels
+        )
 
         mean_total_loss = 0
 
