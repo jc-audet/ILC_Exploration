@@ -1,5 +1,7 @@
 # runs
 runs/*
+tmp/*
+data/*
 
 # synbols
 *.h5py

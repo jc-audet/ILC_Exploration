@@ -4,7 +4,7 @@ import numpy as np
 from torch.utils.data import DataLoader, SubsetRandomSampler
 from torchvision import datasets
 from torchvision.transforms import Compose, ToTensor, Normalize
-from and_mask.models.fastresnet import FastResnet
+from models.fastresnet import FastResnet
 
 
 def set_seed(seed):

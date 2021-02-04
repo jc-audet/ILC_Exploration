@@ -15,8 +15,8 @@ from ignite.metrics import Accuracy, Loss
 from ignite.utils import convert_tensor
 from torch.optim.lr_scheduler import MultiStepLR
 
-import and_mask.and_mask_utils as and_mask_utils
-from and_mask.utils.ignite_cifar10_utils import get_train_test_loaders, get_model
+import gen_mask.gen_mask_utils as gen_mask_utils
+from gen_mask.utils.ignite_cifar10_utils import get_train_test_loaders, get_model
 from optimizers.adam_flexible_weight_decay import AdamFlexibleWeightDecay
 
 
@@ -161,10 +161,8 @@ if __name__ == "__main__":
     parser.add_argument('--output_dir', type=str, required=True)
     parser.add_argument('--num_workers', type=int, default=10)
     parser.add_argument('--data_path', type=str, default="/tmp/cifar_dataset")
-    parser.add_argument('--agreement_threshold', type=float, required=True)
     parser.add_argument('--weight_decay', type=float, required=True)
     parser.add_argument('--method', type=str, choices=['and_mask', 'geom_mean'], required=True)
-    parser.add_argument('--scale_grad_inverse_sparsity', type=int, required=True)
     parser.add_argument('--init_lr', type=float, required=True)
     parser.add_argument('--random_labels_fraction', type=float, required=True)
     parser.add_argument('--weight_decay_order', type=str,
