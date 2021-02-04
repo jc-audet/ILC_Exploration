@@ -1,4 +1,6 @@
 import torch
+import numpy as np
+from scipy.optimize import minimize
 
 def get_grads(batch_size, n_envs, 
               loss_fn, params,
@@ -38,7 +40,29 @@ def get_grads(batch_size, n_envs,
     assert len(param_gradients) == len(params)
     assert len(param_gradients[0]) == n_envs
 
+ 
+    
+
     for param, grads in zip(params, param_gradients):
-        pass
+        
+        def fun(x):
+
+            f = np.zeros(grads[0].shape)
+            for p, env_grad in zip(x, grads):
+                f += p * env_grad.cpu().numpy()
+
+            f_avg = np.zeros(grads[0].shape)
+            for p, env_grad in zip(x, grads):
+                f_avg += env_grad.cpu().numpy()
+            
+            return -np.dot(f.flatten(), f_avg.flatten())
+
+        cons = ({'type':'eq', 'fun': lambda x: np.sum(x) - 1})
+
+        bnds = list([(-2, 2) for i in range(n_envs)])
+
+        res = minimize(fun, np.zeros(n_envs), method='SLSQP', bounds=bnds, constraints=cons)
+
+        print(res)
 
     return mean_loss
