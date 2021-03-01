@@ -1,9 +1,13 @@
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.linalg import eig
+
 import copy
 
 from scipy.integrate import odeint, solve_ivp
-from numpy.linalg import eig
+from scipy.stats import norm
+
+
 
 def ILC_paper_f(x, y):
 
@@ -30,6 +34,19 @@ def ILC_paper_grad(x, y):
 
     return grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y
 
+def ILC_paper_grad_noise(x, y):
+
+    ## Define parameters
+    w=0.3
+    sig = 3
+
+    ## Define grads
+    grad_Z1_x = (200*( w * np.cos(w*y) * np.exp(-w*(x+4)**2 - w*(y+4)**2) * ( np.sin(w*x) + 2*(x+4)*np.cos(w*x) ) ) + 2*(x-2)) + np.random.normal(0, sig, np.shape(x))
+    grad_Z1_y = (200*( w * np.cos(w*x) * np.exp(-w*(x+4)**2 - w*(y+4)**2) * ( np.sin(w*y) + 2*(y+4)*np.cos(w*y) ) )) + np.random.normal(0, sig, np.shape(x))
+    grad_Z2_x = (200*( w * np.cos(w*y) * np.exp(-w*(x+4)**2 - w*(y+4)**2) * ( np.sin(w*x) + 2*(x+4)*np.cos(w*x) ) )) + np.random.normal(0, sig, np.shape(x))
+    grad_Z2_y = (200*( w * np.cos(w*x) * np.exp(-w*(x+4)**2 - w*(y+4)**2) * ( np.sin(w*y) + 2*(y+4)*np.cos(w*y) ) ) + 2*(y-2)) + np.random.normal(0, sig, np.shape(x))
+
+    return grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y
 
 def home_hard_f(x, y):
     
@@ -52,6 +69,20 @@ def home_hard_grad(x, y):
     grad_Z1_y = 100*( w * np.cos(w*x) * np.exp(-w*(x)**2 - w*(y-4)**2) * ( np.sin(w*y) + 2*(y-4)*np.cos(w*y) ) ) + 2*(y+2.5)
     grad_Z2_x = 100*( w * np.cos(w*y) * np.exp(-w*(x)**2 - w*(y-4)**2) * ( np.sin(w*x) + 2*(x)*np.cos(w*x) ) ) + 2*(x-2.5)
     grad_Z2_y = 100*( w * np.cos(w*x) * np.exp(-w*(x)**2 - w*(y-4)**2) * ( np.sin(w*y) + 2*(y-4)*np.cos(w*y) ) ) + 2*(y+2.5)
+
+    return grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y
+
+def home_hard_grad_noise(x, y):
+
+    ## Define parameters
+    w = 0.3
+    sig = 1
+
+    ## Define grads
+    grad_Z1_x = 100*( w * np.cos(w*y) * np.exp(-w*(x)**2 - w*(y-4)**2) * ( np.sin(w*x) + 2*(x)*np.cos(w*x) ) ) + 2*(x+2.5) + np.random.normal(0, sig, np.shape(x))
+    grad_Z1_y = 100*( w * np.cos(w*x) * np.exp(-w*(x)**2 - w*(y-4)**2) * ( np.sin(w*y) + 2*(y-4)*np.cos(w*y) ) ) + 2*(y+2.5) + np.random.normal(0, sig, np.shape(x))
+    grad_Z2_x = 100*( w * np.cos(w*y) * np.exp(-w*(x)**2 - w*(y-4)**2) * ( np.sin(w*x) + 2*(x)*np.cos(w*x) ) ) + 2*(x-2.5) + np.random.normal(0, sig, np.shape(x))
+    grad_Z2_y = 100*( w * np.cos(w*x) * np.exp(-w*(x)**2 - w*(y-4)**2) * ( np.sin(w*y) + 2*(y-4)*np.cos(w*y) ) ) + 2*(y+2.5) + np.random.normal(0, sig, np.shape(x))
 
     return grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y
 
@@ -103,204 +134,301 @@ def home_ez_grad(x, y):
 
     return grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y
 
+def avg_grad(x, y, grad):
 
-def dynamical_sys(f, grad, hack):
-    
-    def diff(t, u):
-        x, y = u
-
-        grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y = grad(x, y)
-
-        avg_grad_x = -grad_Z1_x - grad_Z2_x
-        avg_grad_y = -grad_Z1_y - grad_Z2_y
-
-        mask_x = ( np.abs( ( np.sign(grad_Z1_x) + np.sign(grad_Z2_x) ) / 2 ) > 0.9 ).astype(float)
-        mask_y = ( np.abs( ( np.sign(grad_Z1_y) + np.sign(grad_Z2_y) ) / 2 ) > 0.9 ).astype(float)
-        mask_grad_x = avg_grad_x * mask_x
-        mask_grad_y = avg_grad_y * mask_y
-
-        return [mask_grad_x, mask_grad_y]
-        # return [mask_grad_x, mask_grad_y]
-    
-    def AND_x(t, u):
-        x, y = u
-
-        grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y = grad(x, y)
-
-        mask_x = ( np.abs( ( np.sign(grad_Z1_x) + np.sign(grad_Z2_x) ) / 2 ) > 0.9 ).astype(float)
-
-        return mask_x - 0.5
-    AND_x.terminal = True
-    AND_x.direction = -1.0
-
-    def AND_y(t, u):
-        x, y = u
-
-        grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y = grad(x, y)
-
-        mask_y = ( np.abs( ( np.sign(grad_Z1_y) + np.sign(grad_Z2_y) ) / 2 ) > 0.9 ).astype(float)
-
-        return mask_y - 0.5
-    AND_y.terminal = True
-    AND_y.direction = -1.0
-
-
-    u0 = np.random.uniform(-6,6,2)
-    S = np.empty((2,0))
-    i=1
-
-    if hack:
-        while True:
-
-            sol = solve_ivp(diff, [0.,10.], u0, events=(AND_x, AND_y))
-
-            if np.size(sol.y_events) >= 1:
-                if np.size(sol.y_events[0]) !=0:
-                    u0 = sol.y_events[0][0]
-                else:
-                    u0 = sol.y_events[1][0]
-                
-                x, y = u0
-
-                grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y = grad(x, y)
-
-                avg_grad_x = -grad_Z1_x - grad_Z2_x
-                avg_grad_y = -grad_Z1_y - grad_Z2_y
-                
-                # if np.linalg.norm([grad_Z1_x, grad_Z1_y]) < 1e-4 and np.linalg.norm([grad_Z2_x, grad_Z2_y]) < 1e-4:
-                if np.linalg.norm([grad_Z1_x, grad_Z1_y]) / np.linalg.norm([grad_Z2_x, grad_Z2_y]) < 0.05:
-                    print("Grad break")
-                    break
-                else:
-                    while AND_x(0., u0) < 0:
-                        u0[0] = np.random.uniform(-6,6,1)[0]
-                    while AND_y(0., u0) < 0:
-                        u0[1] = np.random.uniform(-6,6,1)[0]
-            else: 
-                print("no stop break")
-                break
-
-            print(i)
-            i+=1
-
-            S = np.append(S, sol.y, axis = 1)
-    else:
-        sol = solve_ivp(diff, [0.,10.], u0)
-        S = np.append(S, sol.y, axis = 1)
-
-            
-    
-    ## Define space
-    x = np.arange(-6, 6, 0.5)
-    y = np.arange(-6, 6, 0.5)
-
-    xx, yy = np.meshgrid(x, y)
-
-    Z1, Z2 = f(xx,yy)
     grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y = grad(x, y)
+    avg_grad_x = -grad_Z1_x - grad_Z2_x
+    avg_grad_y = -grad_Z1_y - grad_Z2_y
+
+    return [avg_grad_x, avg_grad_y]
+
+def AND_mask(x, y, grad):
+
+    grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y = grad(x, y)
+    avg_grad_x = -grad_Z1_x - grad_Z2_x
+    avg_grad_y = -grad_Z1_y - grad_Z2_y
+
+    mask_x = ( np.abs( ( np.sign(grad_Z1_x) + np.sign(grad_Z2_x) ) / 2 ) > 0.9 ).astype(float)
+    mask_y = ( np.abs( ( np.sign(grad_Z1_y) + np.sign(grad_Z2_y) ) / 2 ) > 0.9 ).astype(float)
+
+    grad_x = avg_grad_x * mask_x 
+    grad_y = avg_grad_y * mask_y 
+
+    return [grad_x, grad_y]
+
+def geom_mean(x, y, grad):
+
+    grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y = grad(x, y)
+    avg_grad_x = -grad_Z1_x - grad_Z2_x
+    avg_grad_y = -grad_Z1_y - grad_Z2_y
+
+    grad_x = np.sign(avg_grad_x) * np.sqrt(np.exp(np.log(np.abs(grad_Z1_x + 1e-10)) + np.log(np.abs(grad_Z2_x + 1e-10))))
+    grad_y = np.sign(avg_grad_y) * np.sqrt(np.exp(np.log(np.abs(grad_Z1_y + 1e-10)) + np.log(np.abs(grad_Z2_y + 1e-10))))
+
+    return [grad_x, grad_y]
+
+def geom_AND(x, y, grad):
+
+    grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y = grad(x, y)
+    avg_grad_x = -grad_Z1_x - grad_Z2_x
+    avg_grad_y = -grad_Z1_y - grad_Z2_y
+
+    g_mean_x = np.sign(avg_grad_x) * np.sqrt(np.exp(np.log(np.abs(grad_Z1_x)) + np.log(np.abs(grad_Z2_x))))
+    g_mean_y = np.sign(avg_grad_y) * np.sqrt(np.exp(np.log(np.abs(grad_Z1_y)) + np.log(np.abs(grad_Z2_y))))
+
+    mask_x = ( np.abs( ( np.sign(grad_Z1_x) + np.sign(grad_Z2_x) ) / 2 ) > 0.9 ).astype(float)
+    mask_y = ( np.abs( ( np.sign(grad_Z1_y) + np.sign(grad_Z2_y) ) / 2 ) > 0.9 ).astype(float)
+
+    grad_x = g_mean_x * mask_x 
+    grad_y = g_mean_y * mask_y 
 
 
-    # plt.contourf(xx, yy, Z1+Z2, levels = 1000, cmap='jet')
+    return [grad_x, grad_y]
+
+def dynamical_sys(x0, y0, f, grad, method, lr, m):
+
+    # Initialization
+    S = np.empty((2,0))
+    S = np.append(S, np.array([x0, y0]), axis=1)
+
+    x, y = x0, y0
+    v_x, v_y = 0, 0
+    for i in range(100):
+        grad_x, grad_y = method(x, y, grad)
+        v_x = m*v_x - lr*grad_x
+        v_y = m*v_y - lr*grad_y
+        x = x - v_x
+        y = y - v_y
+        S = np.append(S, np.array([x, y]), axis=1)
+
     plt.plot(S[0,:], S[1,:], 'r')
+    plt.scatter(x0, y0, c='k')
+    plt.scatter(x, y, c='r')
 
+def dynamical_sys_init(x0, y0, f, grad, method, lr, m):
 
+    x, y = x0, y0
+    v_x, v_y = 0, 0
+    for i in range(150):
+        grad_x, grad_y = method(x, y, grad)
+        v_x = m*v_x - lr*grad_x
+        v_y = m*v_y - lr*grad_y
+        x = x - v_x
+        y = y - v_y
 
-        # if np.abs( ( np.sign(grad_Z1_x) + np.sign(grad_Z2_x) ) / 2 ) > 0.9:
-            
-
-        # mask_y = np.abs( ( np.sign(grad_Z1_y) + np.sign(grad_Z2_y) ) / 2 ) > 0.9
-        # mask_grad_x = avg_grad_x * mask_x
-        # mask_grad_y = avg_grad_y * mask_y
+    # print("(x,y) = (" + str(x) + ", " + str(y) + ")")
+    if np.sqrt(np.power(x+3.125, 2) + np.power(y+3.125, 2)) < 0.5:
+        return [1, 1]
+    elif np.sqrt(np.power(x-2, 2) + np.power(y-2, 2)) < 1:
+        return [1, 0]
+    else:
+        return [0, 0]
 
 
 if __name__ == '__main__':
 
-    ## Choose method
-    hack = True
-    method = 'AND' 
-    # method = 'conf'
+    #########################################################
+    ## Choose vector vizualization
+    #########################################################
+    strmplt = False
 
+    #########################################################
+    ## Choose method 
+    #########################################################
+    # method = avg_grad
+    # method_name = "avg"
+    method = AND_mask
+    method_name = "AND"
+    # method = geom_mean
+    # method_name = "geom"
+    # method = geom_AND
+
+
+    #########################################################
+    ## Learning parameter
+    #########################################################
+    lr = 0.03
+    m = 0.9
+    SGD = False
+
+    #########################################################
     ## Choose function
-    # f = ILC_paper_f
-    # grad = ILC_paper_grad
+    #########################################################
+    f = ILC_paper_f
+    grad = ILC_paper_grad
     # f = home_ez_f
     # grad = home_ez_grad
-    f = home_hard_f
-    grad = home_hard_grad
-    hess = home_hard_hess
+    # f = home_hard_f
+    # grad = home_hard_grad
+    # hess = home_hard_hess
 
+    #########################################################
     ## Define space
-    x = np.arange(-6, 6, 0.5)
-    y = np.arange(-6, 6, 0.5)
+    #########################################################
+    x = np.arange(-6, 6, 0.2)
+    y = np.arange(-6, 6, 0.2)
 
     x, y = np.meshgrid(x, y)
 
-    w = 0.3
-
+    #########################################################
     ## Function
+    #########################################################
     Z1, Z2 = f(x, y)
     grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y = grad(x, y)
 
-    hess_Z1_xx, hess_Z1_xy, hess_Z1_yx, hess_Z1_yy, hess_Z2_xx, hess_Z2_xy, hess_Z2_yx, hess_Z2_yy = hess(x,y)
-
-    hess_Z1 = np.stack([np.stack([hess_Z1_xx, hess_Z1_xy], axis=2), np.stack([hess_Z1_yx, hess_Z1_yy], axis=2)], axis=3)
-
-    hess_Z1_val, hess_Z1_vec = eig(hess_Z1)
-    print(np.shape(hess_Z1_vec))
-
+    #########################################################
     ## Gradient combination
+    #########################################################
     avg_grad_x = - grad_Z1_x - grad_Z2_x
     avg_grad_y = - grad_Z1_y - grad_Z2_y
 
-    if method == 'AND':
-        mask_x = ( np.abs( ( np.sign(grad_Z1_x) + np.sign(grad_Z2_x) ) / 2 ) > 0.9 ).astype(float)
-        mask_y = ( np.abs( ( np.sign(grad_Z1_y) + np.sign(grad_Z2_y) ) / 2 ) > 0.9 ).astype(float)
-        mask_grad_x = avg_grad_x * mask_x
-        mask_grad_y = avg_grad_y * mask_y
+    grad_x, grad_y = method(x, y, grad)
 
-    elif method == 'conf':
-        mask_x = np.abs( ( np.sign(grad_Z1_x) + np.sign(grad_Z2_x) ) / 2 )
-        mask_y = np.abs( ( np.sign(grad_Z1_y) + np.sign(grad_Z2_y) ) / 2 )
-        mask_grad_x = avg_grad_x * mask_x
-        mask_grad_y = avg_grad_y * mask_y
+    #########################################################
+    ## Hessian ridges vizualization
+    #########################################################
+    # hess_Z1_xx, hess_Z1_xy, hess_Z1_yx, hess_Z1_yy, hess_Z2_xx, hess_Z2_xy, hess_Z2_yx, hess_Z2_yy = hess(x,y)
+    # hess_Z1 = np.stack([np.stack([hess_Z1_xx, hess_Z1_xy], axis=2), np.stack([hess_Z1_yx, hess_Z1_yy], axis=2)], axis=3)
+    # hess_Z1_val, hess_Z1_vec = eig(hess_Z1)
+    
+    # fig = plt.figure()
+    # plt.contourf(x, y, hess_Z1_val[:,:,0], levels = 1000, cmap='jet')
+    # plt.streamplot(x, y, hess_Z1_vec[:,:,0,0], hess_Z1_vec[:,:,1,0], density=1.5, color='k', linewidth=1, arrowsize=0.5)
+    # fig = plt.figure()
+    # plt.contourf(x, y, hess_Z1_val[:,:,1], levels = 1000, cmap='jet')
+    # plt.streamplot(x, y, hess_Z1_vec[:,:,0,1], hess_Z1_vec[:,:,1,1], density=1.5, color='k', linewidth=1, arrowsize=0.5)
+    # fig = plt.figure()
+    # plt.contourf(x, y, Z1 + Z2, levels = 1000, cmap='jet')
 
+    #########################################################
+    ## Expected gradient field with AND-Mask
+    #########################################################
+    # diff_grad_x = np.minimum(np.abs(grad_Z1_x), np.abs(grad_Z2_x))
+    # diff_grad_y = np.minimum(np.abs(grad_Z1_y), np.abs(grad_Z2_y))
 
-    fig = plt.figure()
-    plt.contourf(x, y, hess_Z1_val[:,:,0], levels = 1000, cmap='jet')
-    plt.streamplot(x, y, hess_Z1_vec[:,:,0,0], hess_Z1_vec[:,:,1,0], density=1.5, color='k', linewidth=1, arrowsize=0.5)
-    fig = plt.figure()
-    plt.contourf(x, y, hess_Z1_val[:,:,1], levels = 1000, cmap='jet')
-    plt.streamplot(x, y, hess_Z1_vec[:,:,0,1], hess_Z1_vec[:,:,1,1], density=1.5, color='k', linewidth=1, arrowsize=0.5)
+    # sign_trick = np.sign(np.abs(grad_Z1_x) - np.abs(grad_Z2_x))
+    # max_grad_x = grad_Z1_x * (sign_trick+1)/2
+    # max_grad_x += grad_Z2_x * np.abs(sign_trick-1)/2
+    # sign_trick = np.sign(np.abs(grad_Z1_y) - np.abs(grad_Z2_y))
+    # max_grad_y = grad_Z1_y * (sign_trick+1)/2
+    # max_grad_y += grad_Z2_y * np.abs(sign_trick-1)/2
+
+    # p_x = np.zeros(np.shape(diff_grad_x))
+    # p_y = np.zeros(np.shape(diff_grad_y))
+    # for i in range(np.shape(diff_grad_x)[0]):
+    #     for j in range(np.shape(diff_grad_x)[1]):
+    #         p_x[i,j] = n.cdf(diff_grad_x[i,j])
+    #         p_y[i,j] = n.cdf(diff_grad_y[i,j])
+
+    # E_x = p_x * max_grad_x
+    # E_y = p_y * max_grad_y
+
     # fig = plt.figure()
     # plt.contourf(x, y, Z1+Z2, levels = 1000, cmap='jet')
+    # plt.quiver(x, y, diff_grad_x, diff_grad_y, density=1.5, color='k', linewidth=1, arrowsize=0.5)
+    # fig = plt.figure()
+    # heat = plt.contourf(x, y, p_x, levels = 1000, cmap='jet')
+    # plt.quiver(x, y, -max_grad_x, np.zeros(np.shape(max_grad_x)), color='k')
+    # plt.title("X component visualization")
+    # plt.colorbar(heat)
+    # plt.savefig("prob_viz_x.png")
 
-    fig = plt.figure()
-    plt.contourf(x, y, Z1, levels = 1000, cmap='jet')
-    plt.streamplot(x, y, -grad_Z1_x, -grad_Z1_y, density=1.5, color='k', linewidth=1, arrowsize=0.5)
-    plt.savefig("grad_env_A.png")
+
+    # fig = plt.figure()
+    # heat = plt.contourf(x, y, p_y, levels = 1000, cmap='jet')
+    # plt.quiver(x, y, np.zeros(np.shape(max_grad_y)), -max_grad_y, color='k')
+    # plt.title("Y component visualization")
+    # plt.colorbar(heat)
+    # plt.savefig("prob_viz_y.png")
+
+    # fig = plt.figure()
+    # plt.contourf(x, y, Z1+Z2, levels = 1000, cmap='jet')
+    # plt.streamplot(x, y, -E_x, -E_y, density=1.5, color='k', linewidth=1, arrowsize=0.5)
+    # plt.title("Expected gradients")
+    # plt.savefig("grad_expectancy.png")
+
+
+    #########################################################
+    ## Environment Grad visualization (Single, avg)
+    #########################################################
+    # fig = plt.figure()
+    # plt.contourf(x, y, Z1, levels = 1000, cmap='jet')
+    # plt.streamplot(x, y, -grad_Z1_x, -grad_Z1_y, density=1.5, color='k', linewidth=1, arrowsize=0.5)
+    # plt.savefig("grad_env_A.png")
     # fig = plt.figure()
     # plt.contourf(x, y, Z2, levels = 1000, cmap='jet')
     # plt.streamplot(x, y, -grad_Z2_x, -grad_Z2_y, density=1.5, color='k', linewidth=1, arrowsize=0.5)
     # plt.savefig("grad_env_B.png")
-    # fig = plt.figure()
-    # plt.contourf(x, y, Z1+Z2, levels = 1000, cmap='jet')
-    # plt.streamplot(x, y, avg_grad_x, avg_grad_y, density=1.5, color='k', linewidth=1, arrowsize=0.5)
-    # plt.savefig("grad_avg.png")
-    # fig = plt.figure()
-    # plt.contourf(x, y, Z1+Z2, levels = 1000, cmap='jet')
-    # plt.streamplot(x, y, mask_grad_x, mask_grad_y, density=1.5, color='k', linewidth=1, arrowsize=0.5)
-    # plt.savefig("grad_and.png")
-
-
-
-    # plt.show()
+    fig = plt.figure()
+    plt.contourf(x, y, Z1+Z2, levels = 1000, cmap='jet')
+    if strmplt:
+        plt.streamplot(x, y, avg_grad_x, avg_grad_y, density=1.5, color='k', linewidth=1, arrowsize=0.5)
+    else:
+        plt.quiver(x, y, avg_grad_x, avg_grad_y, color='k')
+    plt.title("Average gradients")
+    plt.savefig("grad_avg.png")
 
     plt.figure()
+    # plt.contourf(x, y, np.sqrt(np.power(grad_x, 2) + np.power(grad_y, 2)), levels = 1000, cmap='jet')
     plt.contourf(x, y, Z1 + Z2, levels = 1000, cmap='jet')
-    plt.streamplot(x, y, mask_grad_x, mask_grad_y, density=2, color='k', linewidth=1, arrowsize=0.5)
+    if strmplt:
+        plt.streamplot(x, y, grad_x, grad_y, density=2, color='k', linewidth=1, arrowsize=0.5)
+    else:
+        plt.quiver(x, y, grad_x, grad_y, color='k')
+    plt.savefig("grad_"+str(method_name)+".png")
 
-    # for i in range(200):
-    dynamical_sys(f, grad, hack)
 
-    plt.savefig("dyn_batch.png")
+    #########################################################
+    ## Gradient descent visualization
+    #########################################################
+    if SGD:
+        grad = ILC_paper_grad_noise
+        # grad = home_hard_grad_noise
+
+    plt.figure()
+    # plt.contourf(x, y, np.sqrt(np.power(grad_x, 2) + np.power(grad_y, 2)), levels = 1000, cmap='jet')
+    plt.contourf(x, y, Z1 + Z2, levels = 1000, cmap='jet')
+    if strmplt:
+        plt.streamplot(x, y, grad_x, grad_y, density=2, color='k', linewidth=1, arrowsize=0.5)
+    else:
+        plt.quiver(x, y, grad_x, grad_y, color='k')
+
+
+    x0, y0 = np.array([[-4], [4]])
+    # x0, y0 = np.random.uniform(-6,6,(2,1))
+
+    dynamical_sys(x0, y0, f, grad, method, lr, m)
+
+    # plt.savefig("dyn_batch_noise_hard_3.png")
+    # plt.show()
+
+    ## Batch
+    n = 5
+    conv = np.zeros(np.shape(x))
+    acc = np.zeros(np.shape(x))
+    for k in range(n):
+        print("n: " + str(k))
+        for i in range(np.shape(x)[0]):
+            for j in range(np.shape(x)[1]):
+                state = dynamical_sys_init(x[i,j], y[i,j], f, grad, method, lr, m)
+                conv[i,j] += state[0]
+                acc[i,j] += state[1]
+    acc /= float(n)
+    conv /= float(n)
+
+    if SGD: 
+        opt = "sgd" 
+    else: 
+        opt = "gd"
+
+    plt.figure()
+    clrbar=plt.contourf(x, y, acc, levels=1000)
+    plt.contour(x, y, Z1 + Z2, levels=10, cmap='coolwarm')
+    plt.colorbar(clrbar)
+    plt.savefig("acc_"+str(method_name) + "_" + str(opt) + "_m_" + str(m) + ".png")
+    plt.figure()
+    clrbar = plt.contourf(x, y, conv, levels=1000)
+    plt.contour(x, y, Z1 + Z2, levels=10, cmap='coolwarm')
+    plt.colorbar(clrbar)
+    plt.savefig("conv_"+str(method_name) + "_" + str(opt) + "_m_" + str(m) + ".png")
     plt.show()
