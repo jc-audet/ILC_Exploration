@@ -142,48 +142,20 @@ def avg_grad(x, y, grad):
 
     return [avg_grad_x, avg_grad_y]
 
-def AND_mask(x, y, grad):
+def reptile(x, y, grad, lr):
 
-    grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y = grad(x, y)
-    avg_grad_x = -grad_Z1_x - grad_Z2_x
-    avg_grad_y = -grad_Z1_y - grad_Z2_y
+    k = 20
 
-    mask_x = ( np.abs( ( np.sign(grad_Z1_x) + np.sign(grad_Z2_x) ) / 2 ) > 0.9 ).astype(float)
-    mask_y = ( np.abs( ( np.sign(grad_Z1_y) + np.sign(grad_Z2_y) ) / 2 ) > 0.9 ).astype(float)
+    x_1, y_1 = copy.deepcopy(x), copy.deepcopy(y)
+    x_2, y_2 = copy.deepcopy(x), copy.deepcopy(y)
+    for i in range(k):
 
-    grad_x = avg_grad_x * mask_x 
-    grad_y = avg_grad_y * mask_y 
+        grad_Z1_x, grad_Z1_y, _, _ = grad(x_1, y_1)
+        x_1, y_1 = x_1 - lr*grad_Z1_x, y_1 - lr*grad_Z1_y
+        _, _, grad_Z2_x, grad_Z2_y = grad(x_2, y_2)
+        x_2, y_2 = x_2 - lr*grad_Z2_x, y_2 - lr*grad_Z2_y
 
-    return [grad_x, grad_y]
-
-def geom_mean(x, y, grad):
-
-    grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y = grad(x, y)
-    avg_grad_x = -grad_Z1_x - grad_Z2_x
-    avg_grad_y = -grad_Z1_y - grad_Z2_y
-
-    grad_x = np.sign(avg_grad_x) * np.sqrt(np.exp(np.log(np.abs(grad_Z1_x + 1e-10)) + np.log(np.abs(grad_Z2_x + 1e-10))))
-    grad_y = np.sign(avg_grad_y) * np.sqrt(np.exp(np.log(np.abs(grad_Z1_y + 1e-10)) + np.log(np.abs(grad_Z2_y + 1e-10))))
-
-    return [grad_x, grad_y]
-
-def geom_AND(x, y, grad):
-
-    grad_Z1_x, grad_Z1_y, grad_Z2_x, grad_Z2_y = grad(x, y)
-    avg_grad_x = -grad_Z1_x - grad_Z2_x
-    avg_grad_y = -grad_Z1_y - grad_Z2_y
-
-    g_mean_x = np.sign(avg_grad_x) * np.sqrt(np.exp(np.log(np.abs(grad_Z1_x)) + np.log(np.abs(grad_Z2_x))))
-    g_mean_y = np.sign(avg_grad_y) * np.sqrt(np.exp(np.log(np.abs(grad_Z1_y)) + np.log(np.abs(grad_Z2_y))))
-
-    mask_x = ( np.abs( ( np.sign(grad_Z1_x) + np.sign(grad_Z2_x) ) / 2 ) > 0.9 ).astype(float)
-    mask_y = ( np.abs( ( np.sign(grad_Z1_y) + np.sign(grad_Z2_y) ) / 2 ) > 0.9 ).astype(float)
-
-    grad_x = g_mean_x * mask_x 
-    grad_y = g_mean_y * mask_y 
-
-
-    return [grad_x, grad_y]
+    return [((x_1 - x) + (x_2 - x)) / float(k), ((y_1 - y) + (y_2 - y)) / float(k)]
 
 def dynamical_sys(x0, y0, f, grad, method, lr, m):
 
@@ -194,9 +166,9 @@ def dynamical_sys(x0, y0, f, grad, method, lr, m):
     x, y = x0, y0
     v_x, v_y = 0, 0
     for i in range(100):
-        grad_x, grad_y = method(x, y, grad)
-        v_x = m*v_x - lr*grad_x
-        v_y = m*v_y - lr*grad_y
+        grad_x, grad_y = method(x, y, grad, lr)
+        v_x = m*v_x - 0.25*grad_x
+        v_y = m*v_y - 0.25*grad_y
         x = x - v_x
         y = y - v_y
         S = np.append(S, np.array([x, y]), axis=1)
@@ -230,15 +202,15 @@ if __name__ == '__main__':
     #########################################################
     ## Choose vector vizualization
     #########################################################
-    strmplt = False
+    strmplt = True
 
     #########################################################
     ## Choose method 
     #########################################################
     # method = avg_grad
     # method_name = "avg"
-    method = AND_mask
-    method_name = "AND"
+    method = reptile
+    method_name = "reptile"
     # method = geom_mean
     # method_name = "geom"
     # method = geom_AND
@@ -247,8 +219,8 @@ if __name__ == '__main__':
     #########################################################
     ## Learning parameter
     #########################################################
-    lr = 0.03
-    m = 0.9
+    lr = 0.01
+    m = 0
     SGD = False
 
     #########################################################
@@ -282,7 +254,7 @@ if __name__ == '__main__':
     avg_grad_x = - grad_Z1_x - grad_Z2_x
     avg_grad_y = - grad_Z1_y - grad_Z2_y
 
-    grad_x, grad_y = method(x, y, grad)
+    grad_x, grad_y = method(x, y, grad, 0.01)
 
     #########################################################
     ## Hessian ridges vizualization
@@ -369,7 +341,6 @@ if __name__ == '__main__':
     plt.savefig("grad_avg.png")
 
     plt.figure()
-    # plt.contourf(x, y, np.sqrt(np.power(grad_x, 2) + np.power(grad_y, 2)), levels = 1000, cmap='jet')
     plt.contourf(x, y, Z1 + Z2, levels = 1000, cmap='jet')
     if strmplt:
         plt.streamplot(x, y, grad_x, grad_y, density=2, color='k', linewidth=1, arrowsize=0.5)
@@ -400,35 +371,4 @@ if __name__ == '__main__':
     dynamical_sys(x0, y0, f, grad, method, lr, m)
 
     # plt.savefig("dyn_batch_noise_hard_3.png")
-    # plt.show()
-
-    ## Batch
-    n = 5
-    conv = np.zeros(np.shape(x))
-    acc = np.zeros(np.shape(x))
-    for k in range(n):
-        print("n: " + str(k))
-        for i in range(np.shape(x)[0]):
-            for j in range(np.shape(x)[1]):
-                state = dynamical_sys_init(x[i,j], y[i,j], f, grad, method, lr, m)
-                conv[i,j] += state[0]
-                acc[i,j] += state[1]
-    acc /= float(n)
-    conv /= float(n)
-
-    if SGD: 
-        opt = "sgd" 
-    else: 
-        opt = "gd"
-
-    plt.figure()
-    clrbar=plt.contourf(x, y, acc, levels=1000)
-    plt.contour(x, y, Z1 + Z2, levels=10, cmap='coolwarm')
-    plt.colorbar(clrbar)
-    plt.savefig("acc_"+str(method_name) + "_" + str(opt) + "_m_" + str(m) + ".png")
-    plt.figure()
-    clrbar = plt.contourf(x, y, conv, levels=1000)
-    plt.contour(x, y, Z1 + Z2, levels=10, cmap='coolwarm')
-    plt.colorbar(clrbar)
-    plt.savefig("conv_"+str(method_name) + "_" + str(opt) + "_m_" + str(m) + ".png")
     plt.show()
